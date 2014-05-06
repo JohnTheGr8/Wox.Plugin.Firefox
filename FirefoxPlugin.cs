@@ -20,6 +20,15 @@ namespace Wox.Plugin.Firefox
               LIMIT 20
             ";
 
+        private const string queryTopBookmarks = @"SELECT url, title
+              FROM moz_places
+              WHERE id in (
+                SELECT bm.fk FROM moz_bookmarks bm WHERE bm.fk NOT NULL
+              )
+              ORDER BY visit_count DESC
+              LIMIT 20
+            ";
+
         private const string dbPathFormat = "Data Source ={0};Version=3;New=False;Compress=True;";
 
         public void Init(PluginInitContext context)
@@ -31,11 +40,14 @@ namespace Wox.Plugin.Firefox
         {
             string param = query.GetAllRemainingParameter();
 
-            //TODO: List most-visited bookmarks when no arguements have yet been passed
+            var results = new List<MozBookmark>();
+            
             if (string.IsNullOrEmpty(param))
-                return new List<Result>();
+                results = GetBookmarks(top: true);
+            else
+                results = GetBookmarks(param);
 
-            return GetBookmarks(param).Select(x => new Result
+            return results.Select(x => new Result
                 {
                     Title = x.title,
                     SubTitle = x.url,
@@ -43,12 +55,12 @@ namespace Wox.Plugin.Firefox
                 }).ToList();
         }
 
-        public List<MozBookmark> GetBookmarks(string search)
+        public List<MozBookmark> GetBookmarks(string search = null, bool top = false)
         {
             string dbPath = string.Format(dbPathFormat, PlacesPath);
             var dbConnection = new SQLiteConnection(dbPath);
 
-            string query = string.Format(queryFormat, search);
+            string query = top ? queryTopBookmarks : string.Format(queryFormat, search);
 
             dbConnection.Open();
             var reader = new SQLiteCommand(query, dbConnection).ExecuteReader();
