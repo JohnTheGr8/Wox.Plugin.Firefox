@@ -1,0 +1,11 @@
+{
+    "ID":"4EB5722375314E948280261901E91698",
+    "ActionKeyword":"ff",
+    "Name":"Wox.Plugin.Firefox",
+    "Description":"Firefox search plugin for Wox",
+    "Author":"Ioannis G. (@JohnTheGr8)",
+    "Version":"1.0.0",
+    "Language":"csharp",
+    "Website":"https://github.com/JohnTheGr8/Wox.Plugin.Firefox",
+    "ExecuteFileName":"Wox.Plugin.Firefox.dll"
+}
