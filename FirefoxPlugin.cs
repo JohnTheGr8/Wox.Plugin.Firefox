@@ -10,7 +10,7 @@ namespace Wox.Plugin.Firefox
     {
         private PluginInitContext _context;
 
-        private const string queryFormat = @"SELECT url, title
+        private const string queryBookmarks = @"SELECT url, title
               FROM moz_places
               WHERE id in (
                 SELECT bm.fk FROM moz_bookmarks bm WHERE bm.fk NOT NULL
@@ -29,6 +29,19 @@ namespace Wox.Plugin.Firefox
               LIMIT 20
             ";
 
+        private const string queryHistory = @"SELECT url, title
+              FROM moz_places
+              WHERE  ( url LIKE '%{0}%' OR title LIKE '%{0}%' )
+              ORDER BY visit_count DESC
+              LIMIT 20
+            ";
+
+        private const string queryTopHistory = @"SELECT url, title
+              FROM moz_places
+              ORDER BY visit_count DESC
+              LIMIT 20
+            ";
+
         private const string dbPathFormat = "Data Source ={0};Version=3;New=False;Compress=True;";
 
         public void Init(PluginInitContext context)
@@ -38,14 +51,18 @@ namespace Wox.Plugin.Firefox
 
         public List<Result> Query(Query query)
         {
-            string param = query.GetAllRemainingParameter();
+            string param = query.GetAllRemainingParameter().TrimStart();
 
-            var results = new List<MozBookmark>();
-            
-            if (string.IsNullOrEmpty(param))
-                results = GetBookmarks(top: true);
-            else
-                results = GetBookmarks(param);
+            var historySearch = query.ActionParameters.Count > 0 && query.ActionParameters[0].Equals("-h");
+
+            if (historySearch)
+                param = param.Substring("-h".Length).TrimStart();
+
+            var topResults = string.IsNullOrEmpty(param);
+
+            List<MozPlace> results = (historySearch) ? 
+                GetHistory(param, topResults) : 
+                GetBookmarks(param, topResults);
 
             return results.Select(x => new Result
                 {
@@ -55,21 +72,33 @@ namespace Wox.Plugin.Firefox
                 }).ToList();
         }
 
-        public List<MozBookmark> GetBookmarks(string search = null, bool top = false)
+        public List<MozPlace> GetHistory(string search = null, bool top = false)
+        {
+            string query = top ? queryTopHistory : string.Format(queryHistory, search);
+
+            return GetResults(query);
+        } 
+
+        public List<MozPlace> GetBookmarks(string search = null, bool top = false)
+        {
+            string query = top ? queryTopBookmarks : string.Format(queryBookmarks, search);
+
+            return GetResults(query);
+        }
+
+        private List<MozPlace> GetResults(string query)
         {
             string dbPath = string.Format(dbPathFormat, PlacesPath);
             var dbConnection = new SQLiteConnection(dbPath);
 
-            string query = top ? queryTopBookmarks : string.Format(queryFormat, search);
-
             dbConnection.Open();
             var reader = new SQLiteCommand(query, dbConnection).ExecuteReader();
 
-            return reader.Select(x => new MozBookmark()
-                {
-                    title = (x["title"] is DBNull) ? string.Empty : x["title"].ToString(),
-                    url = x["url"].ToString()
-                }).ToList();
+            return reader.Select(x => new MozPlace()
+            {
+                title = (x["title"] is DBNull) ? string.Empty : x["title"].ToString(),
+                url = x["url"].ToString()
+            }).ToList();
         }
 
         /// <summary>
@@ -87,11 +116,10 @@ namespace Wox.Plugin.Firefox
                                      folders.FirstOrDefault(d => File.Exists(d + @"\places.sqlite") && d.EndsWith(".default"))
                                      ?? folders.First(d => File.Exists(d + @"\places.sqlite")));
             }
-
         }
     }
 
-    public class MozBookmark
+    public class MozPlace
     {
         public string title;
 
