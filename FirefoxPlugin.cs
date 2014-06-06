@@ -53,13 +53,17 @@ namespace Wox.Plugin.Firefox
         {
             string param = query.GetAllRemainingParameter().TrimStart();
 
+            // Is this history search?
             var historySearch = query.ActionParameters.Count > 0 && query.ActionParameters[0].Equals("-h");
 
+            // If it is history search, remove the -h flag from param
             if (historySearch)
                 param = param.Substring("-h".Length).TrimStart();
 
+            // Should top results be returned? (true if no search parameters have been passed)
             var topResults = string.IsNullOrEmpty(param);
 
+            // Get results, either bookmarks or history
             List<MozPlace> results = (historySearch) ? 
                 GetHistory(param, topResults) : 
                 GetBookmarks(param, topResults);
@@ -74,6 +78,7 @@ namespace Wox.Plugin.Firefox
 
         public List<MozPlace> GetHistory(string search = null, bool top = false)
         {
+            // Create the query command for the given case
             string query = top ? queryTopHistory : string.Format(queryHistory, search);
 
             return GetResults(query);
@@ -81,19 +86,26 @@ namespace Wox.Plugin.Firefox
 
         public List<MozPlace> GetBookmarks(string search = null, bool top = false)
         {
+            // Create the query command for the given case
             string query = top ? queryTopBookmarks : string.Format(queryBookmarks, search);
 
             return GetResults(query);
         }
 
+        /// <summary>
+        /// Searches the places.sqlite db based on the given query and returns the results
+        /// </summary>
         private List<MozPlace> GetResults(string query)
         {
+            // create the connection string and init the connection
             string dbPath = string.Format(dbPathFormat, PlacesPath);
             var dbConnection = new SQLiteConnection(dbPath);
 
+            // Open connection to the database file and execute the query
             dbConnection.Open();
             var reader = new SQLiteCommand(query, dbConnection).ExecuteReader();
 
+            // return results in List<MozPlace> format
             return reader.Select(x => new MozPlace()
             {
                 title = (x["title"] is DBNull) ? string.Empty : x["title"].ToString(),
